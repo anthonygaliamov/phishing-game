@@ -1,0 +1,737 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Phishing Email Trainer — Styled Emails</title>
+  <style>
+    body {font-family: Segoe UI, Roboto, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif; background: #f3f4f6; margin: 0;}
+    .outlook-window {display: flex; width: 100%; height: 100vh;}
+    .sidebar {width: 220px; background: #ffffff; border-right: 1px solid #e5e7eb; display: flex; flex-direction: column;}
+    .sidebar h2 {font-size: 18px; font-weight: 600; padding: 16px; border-bottom: 1px solid #e5e7eb; margin: 0;}
+    .sidebar ul {list-style: none; padding: 0; margin: 0;}
+    .sidebar li {padding: 12px 16px; cursor: pointer; color: #374151;}
+    .sidebar li:hover, .sidebar li.active {background: #e5f0ff; color: #1d4ed8; font-weight: 500;}
+    .score-box {margin-top: auto; background: #f9fafb; padding: 16px; text-align: center; border-top: 1px solid #e5e7eb;}
+    .score-value {font-size: 22px; font-weight: 700; color: #2563eb;}
+    .score-label {font-size: 13px; color: #6b7280;}
+    .inbox {flex: 1; display: flex; flex-direction: column;}
+    .inbox-header {display: flex; justify-content: space-between; align-items: center; background: #ffffff; border-bottom: 1px solid #e5e7eb; padding: 12px 16px;}
+    .inbox-header h3 {margin: 0; font-size: 18px; font-weight: 600;}
+    .email-area {display:flex; flex:1; overflow:hidden}
+    .email-list {background: #ffffff; width: 360px; overflow-y: auto; border-right:1px solid #e5e7eb}
+    .email-item {padding: 14px 16px; border-bottom: 1px solid #e5e7eb; cursor: pointer;}
+    .email-item:hover {background: #f3f4f6;}
+    .email-item.active {background: #e0ebff;}
+    .email-subject {font-weight: 600; color: #111827; margin-bottom: 4px;}
+    .email-sender {color: #374151; font-size: 13px;}
+    .email-snippet {color: #6b7280; font-size: 13px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;}
+    .reader {flex: 1; background: #ffffff; padding: 20px; overflow-y: auto;}
+    .reader h4 {margin-top: 0; font-size: 20px; color: #111827;}
+    .email-meta {font-size: 13px; color: #6b7280; margin-bottom: 10px;}
+    .button-bar {margin-top: 20px; display: flex; gap: 10px;}
+    button {border: none; border-radius: 6px; padding: 10px 16px; cursor: pointer; font-weight: 500; font-size: 14px;}
+    .btn-phish {background: #ef4444; color: #ffffff;}
+    .btn-legit {background: #2563eb; color: #ffffff;}
+    .btn-next {background: #e5e7eb; color: #111827;}
+    .result-box {margin-top: 16px; padding: 12px; border-radius: 8px;}
+    .correct {background: #ecfdf5; border: 1px solid #bbf7d0; color: #065f46;}
+    .incorrect {background: #fef2f2; border: 1px solid #fecaca; color: #7f1d1d;}
+    .email-html {border:1px solid #eef2ff;border-radius:8px;padding:16px;background:#fff}
+    .callout {padding:12px;border-radius:6px;background:#f8fafc;border:1px solid #e6f0ff;margin:12px 0}
+    .danger {color:#b91c1c;font-weight:700}
+    .btn-link {display:inline-block;padding:10px 14px;border-radius:6px;text-decoration:none;font-weight:600}
+    .btn-primary {background:#2563eb;color:#fff}
+    .btn-outline {background:#fff;border:1px solid #dbeafe;color:#2563eb}
+    .small {font-size:13px;color:#6b7280}
+
+    /* Modal styles */
+    #modal-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(2,6,23,0.5);z-index:9999}
+    .modal{width:480px;background:#fff;border-radius:10px;padding:18px;border:1px solid #e6eefb;box-shadow:0 10px 30px rgba(2,6,23,0.2)}
+    .modal h3{margin:0 0 8px 0;font-size:18px}
+    .modal .modal-body{color:#111827;font-size:14px}
+    .modal .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+    .modal .btn{padding:8px 12px;border-radius:8px}
+    .modal .btn.primary{background:#2563eb;color:#fff}
+    .modal .btn.ghost{background:#f3f4f6}
+
+    /* Confetti canvas */
+    #confetti-canvas { position: fixed; inset: 0; pointer-events: none; display: none; z-index:10001; }
+  </style>
+</head>
+<body>
+  <div class="outlook-window">
+    <div class="sidebar">
+      <h2>Outlook</h2>
+      <ul>
+        <li class="active">Inbox</li>
+        <li>Sent Items</li>
+        <li>Junk Email</li>
+      </ul>
+      <div class="score-box">
+        <div class="score-value" id="score">0/10</div>
+        <div class="score-label">Correct answers</div>
+      </div>
+    </div>
+
+    <div class="inbox">
+      <div class="inbox-header">
+        <h3>Inbox</h3>
+        <span id="remaining">10 remaining</span>
+      </div>
+      <div class="email-area">
+        <div class="email-list" id="emailList"></div>
+        <div class="reader" id="reader">
+          <div id="reader-empty">Select an email to begin.</div>
+          <div id="reader-content" style="display:none;">
+            <div class="email-meta" id="email-meta"></div>
+            <h4 id="email-subject"></h4>
+            <div id="email-body"></div>
+
+            <div class="button-bar">
+              <button class="btn-phish" id="btnPhish">Mark as Phishing</button>
+              <button class="btn-legit" id="btnLegit">Mark as Legitimate</button>
+              <button class="btn-next" id="nextBtn">Next</button>
+            </div>
+
+            <div id="feedback"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal overlay (module UI replaces alerts/confirms) -->
+  <div id="modal-overlay" aria-hidden="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <h3 id="modal-title"></h3>
+      <div class="modal-body" id="modal-body"></div>
+      <div class="modal-actions" id="modal-actions"></div>
+    </div>
+  </div>
+
+  <!-- Confetti canvas -->
+  <canvas id="confetti-canvas" width="800" height="600" aria-hidden="true"></canvas>
+
+  <script>
+    // Modal module
+    const modalOverlay = document.getElementById('modal-overlay');
+    const modalTitle = document.getElementById('modal-title');
+    const modalBody = document.getElementById('modal-body');
+    const modalActions = document.getElementById('modal-actions');
+
+    function showModal(title, html, buttons = [{text:'OK', kind:'primary', value:true}]) {
+      return new Promise((resolve) => {
+        modalTitle.textContent = title || '';
+        modalBody.innerHTML = html || '';
+        modalActions.innerHTML = '';
+        buttons.forEach(btn => {
+          const b = document.createElement('button');
+          b.className = 'btn ' + (btn.kind === 'primary' ? 'primary' : 'ghost');
+          b.textContent = btn.text || 'OK';
+          b.addEventListener('click', () => {
+            modalOverlay.style.display = 'none';
+            modalOverlay.setAttribute('aria-hidden', 'true');
+            resolve(btn.value !== undefined ? btn.value : true);
+          });
+          modalActions.appendChild(b);
+        });
+        // Show and focus
+        modalOverlay.style.display = 'flex';
+        modalOverlay.setAttribute('aria-hidden', 'false');
+        const firstBtn = modalActions.querySelector('button');
+        if (firstBtn) firstBtn.focus();
+      });
+    }
+
+    function showConfirm(title, html) {
+      return showModal(title, html, [
+        {text:'Cancel', kind:'ghost', value:false},
+        {text:'Take Bonus', kind:'primary', value:true}
+      ]);
+    }
+
+    // --- Confetti implementation (lightweight) ---
+    const confettiCanvas = document.getElementById('confetti-canvas');
+    const confettiCtx = confettiCanvas.getContext && confettiCanvas.getContext('2d');
+    let confettiParticles = [];
+    let confettiAnimId = null;
+
+    function resizeCanvas() {
+      confettiCanvas.width = window.innerWidth;
+      confettiCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function createConfettiParticle() {
+      const colors = ['#ef4444','#f59e0b','#10b981','#2563eb','#8b5cf6','#ec4899'];
+      return {
+        x: Math.random()*confettiCanvas.width,
+        y: -10 - Math.random()*confettiCanvas.height*0.2,
+        w: 8 + Math.random()*10,
+        h: 6 + Math.random()*8,
+        rot: Math.random()*360,
+        velX: (Math.random()-0.5)*6,
+        velY: 2 + Math.random()*6,
+        rotVel: (Math.random()-0.5)*20,
+        color: colors[Math.floor(Math.random()*colors.length)],
+        ttl: 300 + Math.random()*200
+      };
+    }
+
+    function launchConfetti(duration = 3500, count = 160) {
+      if (!confettiCtx) return Promise.resolve();
+      confettiParticles = [];
+      for (let i=0;i<count;i++) confettiParticles.push(createConfettiParticle());
+      confettiCanvas.style.display = 'block';
+      const start = performance.now();
+
+      return new Promise((resolve) => {
+        function step(now) {
+          const t = now - start;
+          confettiCtx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height);
+          for (let p of confettiParticles) {
+            p.x += p.velX;
+            p.y += p.velY;
+            p.velY += 0.05; // gravity
+            p.rot += p.rotVel;
+            p.ttl--;
+            confettiCtx.save();
+            confettiCtx.translate(p.x, p.y);
+            confettiCtx.rotate(p.rot * Math.PI / 180);
+            confettiCtx.fillStyle = p.color;
+            confettiCtx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+            confettiCtx.restore();
+          }
+          // remove dead
+          confettiParticles = confettiParticles.filter(p => p.ttl > 0 && p.y < confettiCanvas.height + 50);
+          if (t < duration || confettiParticles.length) {
+            confettiAnimId = requestAnimationFrame(step);
+          } else {
+            confettiCanvas.style.display = 'none';
+            cancelAnimationFrame(confettiAnimId);
+            confettiParticles = [];
+            confettiAnimId = null;
+            resolve();
+          }
+        }
+        confettiAnimId = requestAnimationFrame(step);
+      });
+    }
+
+    // richer, styled email bodies (safe for training: links are non-navigable)
+    const emails = [
+      {
+        id:1,
+        from:'security@paypal-support.com',
+        subject:'URGENT: Your account will be suspended!',
+        snippet:'Your PayPal account has been limited due to suspicious activity. Verify now.',
+        body: `
+          <div class="email-html">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="width:52px;height:52px;border-radius:8px;background:#1e40af;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">P</div>
+              <div>
+                <div style="font-weight:700">PayPal Security</div>
+                <div class="small">secure@paypa1-verify.com</div>
+              </div>
+            </div>
+
+            <div class="callout" style="margin-top:12px">
+              <div class="danger">Action required — <strong>24 hours left</strong></div>
+              <div class="small">Our systems detected unusual activity. To avoid permanent suspension, verify your account immediately.</div>
+            </div>
+
+            <p>Hello,</p>
+            <p>Your PayPal account has been limited due to suspicious activity. Please verify your account by clicking the button below:</p>
+            <p><a href="#" data-link class="btn-link btn-primary">VERIFY YOUR ACCOUNT NOW</a></p>
+            <p class="small">If you did not attempt to sign in, contact <em>support</em>. This email was sent by <strong>PayPal Security</strong>.</p>
+            <hr />
+            <p class="small">Note: Genuine PayPal emails usually address you by your full name and show the correct domain: paypal.com</p>
+          </div>
+        `,
+        isPhish:true,
+        indicators:["Spoofed sender domain","Urgency and threat","Prominent CTA with mismatched domain"]
+      },
+      {
+        id:2,
+        from:'hr@amp.com',
+        subject:'Reminder: Monthly timesheet due',
+        snippet:'Please submit your timesheet by Friday.',
+        body: `
+          <div class="email-html">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div>
+                <div style="font-weight:700">HR Team</div>
+                <div class="small">hr@amp.com</div>
+              </div>
+              <div class="small">Due: Friday</div>
+            </div>
+            <p>Hi Anthony,</p>
+            <p>This is a reminder to submit your monthly timesheet via the company portal.</p>
+            <p><a href="#" class="btn-link btn-outline" data-link>Open timesheet</a></p>
+            <p class="small">No action required if already submitted.</p>
+          </div>
+        `,
+        isPhish:false,
+        indicators:["Known internal sender","Personalised name","No credential request"]
+      },
+      {
+        id:3,
+        from:'it-support@secure-cloud.com',
+        subject:'Password Expiry — Action Required',
+        snippet:'Your password will expire. Update it now using the link below.',
+        body: `
+          <div class="email-html">
+            <div style="display:flex;gap:12px;align-items:center">
+              <div style="width:44px;height:44px;border-radius:50%;background:#0ea5a4;color:#fff;display:flex;align-items:center;justify-content:center">IT</div>
+              <div>
+                <div style="font-weight:700">IT Support</div>
+                <div class="small">it-support@secure-cloud.com</div>
+              </div>
+            </div>
+            <p>Dear user,</p>
+            <p>Your password is set to expire in 2 days. To avoid lockout, update using the secure portal.</p>
+            <table style="width:100%;border-collapse:collapse;margin:12px 0">
+              <tr><td style="padding:8px;border:1px solid #e6edf3">Username</td><td style="padding:8px;border:1px solid #e6edf3">you@amp.com</td></tr>
+            </table>
+            <p><a href="#" class="btn-link btn-primary" data-link>Update password</a></p>
+            <p class="small">If you did not request this, contact IT directly.</p>
+          </div>
+        `,
+        isPhish:true,
+        indicators:["External domain similar to real provider","Credential-reset CTA","Generic salutation"]
+      },
+      {
+        id:4,
+        from:'events@conference2025.org',
+        subject:'Invitation: Speaking slot at Conference 2025',
+        snippet:'We would like to invite you to speak at our upcoming conference.',
+        body: `
+          <div class="email-html">
+            <div style="font-weight:700">Conference 2025 — Speaker Team</div>
+            <div class="small">events@conference2025.org</div>
+            <p>Dear Anthony,</p>
+            <p>We would like to invite you to present a 20-minute talk at Conference 2025. Please reply with your talk title and a short bio.</p>
+            <div style="margin-top:8px" class="small">No links requested — reply to accept.</div>
+          </div>
+        `,
+        isPhish:false,
+        indicators:["Personalised invitation","Plausible content","No credential request or suspicious links"]
+      },
+      {
+        id:5,
+        from:'paypal@service-security.com',
+        subject:'Payment failed — update billing info',
+        snippet:"We couldn't process a payment. Update your billing info.",
+        body: `
+          <div class="email-html">
+            <div style="display:flex;align-items:center;gap:12px">
+              <div style="width:44px;height:44px;border-radius:8px;background:#111827;color:#fff;display:flex;align-items:center;justify-content:center">$</div>
+              <div>
+                <div style="font-weight:700">Billing Department</div>
+                <div class="small">paypal@service-security.com</div>
+              </div>
+            </div>
+            <p>Dear Customer,</p>
+            <p>We were unable to process your recent payment. Please update your billing details to avoid suspension.</p>
+            <p><a href="#" class="btn-link btn-primary" data-link>Update billing details</a></p>
+            <p class="small">This message contains payment-related language to create urgency.</p>
+          </div>
+        `,
+        isPhish:true,
+        indicators:["Billing scare tactic","Sender domain not exact match to real provider","CTA link"]
+      },
+      {
+        id:6,
+        from:'trusted-partner@vendor.com',
+        subject:'Invoice ATT00023 (PDF)',
+        snippet:'Attached is your invoice.',
+        body: `
+          <div class="email-html">
+            <div style="font-weight:700">Vendor Accounts</div>
+            <div class="small">trusted-partner@vendor.com</div>
+            <p>Hi,</p>
+            <p>Please find attached invoice <strong>ATT00023</strong> for this month. (Attachment removed for this training demo.)</p>
+            <p class="small">If you were not expecting this, verify by calling your vendor contact directly.</p>
+          </div>
+        `,
+        isPhish:false,
+        indicators:["Specific invoice reference","Known vendor tone","Attachment noted but removed"]
+      },
+      {
+        id:7,
+        from:'john.doe@contractor-portal.com',
+        subject:'Urgent: Missing documents for payment',
+        snippet:'Please upload documents now to avoid payment delays.',
+        body: `
+          <div class="email-html">
+            <div style="font-weight:700">Contractor Portal</div>
+            <div class="small">john.doe@contractor-portal.com</div>
+            <p>Hi,</p>
+            <p>We still need your contractor paperwork to finalise payment. Upload documents here:</p>
+            <p><a href="#" class="btn-link btn-primary" data-link>Upload documents</a></p>
+            <p class="small">This message pressures for fast action before payment runs late.</p>
+          </div>
+        `,
+        isPhish:true,
+        indicators:["Unexpected upload link","Pressure to act quickly","Sender not recognised"]
+      },
+      {
+        id:8,
+        from:'security@github.com',
+        subject:'New sign-in to your GitHub account',
+        snippet:'A new sign-in was detected. Review activity.',
+        body: `
+          <div class="email-html">
+            <div style="display:flex;gap:12px;align-items:center">
+              <div style="width:44px;height:44px;border-radius:50%;background:#0f172a;color:#fff;display:flex;align-items:center;justify-content:center">G</div>
+              <div>
+                <div style="font-weight:700">GitHub Security</div>
+                <div class="small">security@github.com</div>
+              </div>
+            </div>
+            <p>We noticed a sign-in to your GitHub account from a new location. If this wasn't you, review activity on your account.</p>
+            <p class="small">For security, visit <strong>github.com</strong> directly rather than following links in the email.</p>
+          </div>
+        `,
+        isPhish:false,
+        indicators:["Official guidance to go directly to site","No credential harvesting link"]
+      },
+      {
+        id:9,
+        from:'rewardsteam@onlinestore.net',
+        subject:'You won a $500 gift voucher!',
+        snippet:'Claim your prize by clicking here',
+        body: `
+          <div class="email-html">
+            <div style="font-weight:700">Rewards Team</div>
+            <div class="small">rewardsteam@onlinestore.net</div>
+            <p>Congratulations!</p>
+            <p>You have been selected to receive a <strong>$500</strong> gift voucher. Claim now:</p>
+            <p><a href="#" class="btn-link btn-primary" data-link>Claim your prize</a></p>
+            <p class="small">Offers that sound too good to be true usually are.</p>
+          </div>
+        `,
+        isPhish:true,
+        indicators:["Too-good-to-be-true offer","Urgent CTA","Unknown sender domain"]
+      },
+      {
+        id:10,
+        from:'scott.barnett@amp-leadership.com.au',
+        subject:'AMP Company Update: 28 October 2025',
+        snippet:'Security Awareness Week Annoucements.',
+        body: `
+          <div class="email-html">
+            <div style="display:flex;gap:12px;align-items:center">
+              <div style="width:44px;height:44px;border-radius:50%;background:#111827;color:#fff;display:flex;align-items:center;justify-content:center">C</div>
+              <div>
+                <div style="font-weight:700">Scott Barnett</div>
+                <div class="small">scott.barnett@amp-leadership.com.au</div>
+              </div>
+            </div>
+            <p>Hi everyone,</p>
+            <p>This <a href="https://amp.share-point-internal.com/cyber-awareness-week" data-link>Cyber Security Awareness Week</a> I want to talk about how we can keep our data safe and secure. This follows on from the video I shared in July about <a href="https://amp.share-point-internal.com/cyber-awareness-week" data-link>the importance of cyber security</a>.<br>AMP holds sensitive data about our customers, and it's because of this, it's important we all know how to protect our devices and accounts from cyber threats.<br>
+              <ul>
+                <li>keeping your devices secure by installing all software updates</li>
+                <li>using a unique and strange passphrase for every account</li>
+                <li>setting up Multi-Factor Authentication (MFA) where available.</li>
+              </ul>
+              You can find more information and <a href="https://amp.share-point-internal.com/cyber-awareness-week" data-link>book a cyber awareness session</a>.<br>
+              If you have any questions, please reach out to the IT Helpdesk on 1300 422 533.
+              </p>
+            <p>Thanks,<br>Scott Barnett<br>Head of Technology</p>
+          </div>
+        `,
+        isPhish:true,
+        indicators:["Sender domain uses plausible prefix to look official","IT phone number provided which does not belong to company","Encourages clicking on what seem to be internal links"]
+      }
+    ];
+
+    // --- ADD: 10 extremely hard-to-guess phishing examples (very subtle indicators) ---
+    const hardEmails = [
+      {
+        id:201,
+        from:'accounts@microbancorp.com',
+        subject:'Invoice statement attached — no action required',
+        snippet:'Monthly statement for your review.',
+        body: `<div class="email-html"><div style="font-weight:700">Accounts — MicroBancorp</div><div class="small">accounts@microbancorp.com</div><p>Dear Anthony,</p><p>Please find your monthly statement attached for your records.</p><p class="small">If you have questions reply to this message.</p></div>`,
+        isPhish:true,
+        indicators:["Domain is legitimate-looking (microbancorp vs micro-bank)", "Attachment reference but no invoice number", "Reply-to could be abused"]
+      },
+      {
+        id:202,
+        from:'no-reply@appleid.apple.com',
+        subject:'Apple ID: New device linked',
+        snippet:'A familiar device was added to your account.',
+        body: `<div class="email-html"><div style="font-weight:700">Apple ID</div><div class="small">no-reply@appleid.apple.com</div><p>Hi Anthony,</p><p>Your Apple ID was used to sign in on a new device. If this was you, no action required.</p><p class="small">Genuine-looking sender name and neutral tone.</p></div>`,
+        isPhish:true,
+        indicators:["Very plausible sender address format","No urgent CTA — subtle trick to get you to reply or click later"]
+      },
+      {
+        id:203,
+        from:'help@slack.com',
+        subject:'Suspicious workspace activity — review recommended',
+        snippet:'We noticed an unusual integration installation.',
+        body: `<div class="email-html"><div style="font-weight:700">Slack Support</div><div class="small">help@slack.com</div><p>We've detected a new integration in your workspace. Review your integrations in the admin console.</p><p class="small">Message guides user to admin UI (may prompt later link).</p></div>`,
+        isPhish:true,
+        indicators:["No direct credential harvest in body","Reference to admin actions to lull the recipient into trusting the message"]
+      },
+      {
+        id:204,
+        from:'payments@stripe-ops.com',
+        subject:'Notice: Small test charge processed',
+        snippet:'We processed a test charge of $0.02',
+        body: `<div class="email-html"><div style="font-weight:700">Stripe Payments</div><div class="small">payments@stripe-ops.com</div><p>This is a transaction notification for a small test charge on your account. If this was not you, review activity.</p></div>`,
+        isPhish:true,
+        indicators:["Very small harmless-sounding charge to prompt investigation","Sender domain uses plausible prefix to look official"]
+      },
+      {
+        id:205,
+        from:'newsletter@nytimes-delivery.com',
+        subject:'Your subscription delivery has been updated',
+        snippet:'A small change to your delivery preferences.',
+        body: `<div class="email-html"><div style="font-weight:700">NYTimes Subscriptions</div><div class="small">newsletter@nytimes-delivery.com</div><p>Your delivery preferences were updated. If this was you, ignore.</p></div>`,
+        isPhish:true,
+        indicators:["Legitimate brand name in sender display but domain is different","non-threatening language makes it easy to miss"]
+      },
+      {
+        id:206,
+        from:'teams-notify@office365.com',
+        subject:'Policy change: New retention policy applied',
+        snippet:'A non-urgent admin message about retention.',
+        body: `<div class="email-html"><div style="font-weight:700">Microsoft Teams</div><div class="small">teams-notify@office365.com</div><p>We've applied a new retention policy. Review the policy in the Security & Compliance center.</p></div>`,
+        isPhish:true,
+        indicators:["Uses plausible internal-sounding address","no CTA but invites visiting admin consoles later"]
+      },
+      {
+        id:207,
+        from:'support@linkedin-mail.com',
+        subject:'New message marked important',
+        snippet:'A message was flagged important in your inbox.',
+        body: `<div class="email-html"><div style="font-weight:700">LinkedIn Support</div><div class="small">support@linkedin-mail.com</div><p>We've flagged a message as important for visibility. Review it in your inbox.</p></div>`,
+        isPhish:true,
+        indicators:["Sender domain mimics legitimate provider with a minor change","encourages checking account where malicious link may be served later"]
+      },
+      {
+        id:208,
+        from:'billing@adwords.google.com',
+        subject:'Invoice adjustment processed',
+        snippet:'An adjustment to your last invoice was issued.',
+        body: `<div class="email-html"><div style="font-weight:700">Google Ads Billing</div><div class="small">billing@adwords.google.com</div><p>An adjustment was applied to your account. See details in billing center.</p></div>`,
+        isPhish:true,
+        indicators:["Very specific billing language with link-less copy","uses subdomain that appears official"]
+      },
+      {
+        id:209,
+        from:'security@bankingalerts.com',
+        subject:'We noticed a small setting change',
+        snippet:'A non-critical setting was changed on your account.',
+        body: `<div class="email-html"><div style="font-weight:700">Bank Alerts</div><div class="small">security@bankingalerts.com</div><p>A security setting was changed. If you did not change this, reply or visit your account.</p></div>`,
+        isPhish:true,
+        indicators:["Asks to reply (dangerous) and domain format is plausible","very mild language reduces suspicion"]
+      },
+      {
+        id:210,
+        from:'support@apple-payments.com',
+        subject:'Verification completed for your device',
+        snippet:'Your device verification succeeded.',
+        body: `<div class="email-html"><div style="font-weight:700">Apple Payments</div><div class="small">support@apple-payments.com</div><p>Your device was verified successfully. If this was not you, contact support.</p></div>`,
+        isPhish:true,
+        indicators:["Looks like a confirmation rather than a warning — subtle social engineering","sender domain slightly off from official domain"]
+      }
+    ];
+
+    // --- POOL + RANDOM SELECTION ---
+    // Keep game to TARGET number of emails randomly sampled from the combined pool.
+    const TARGET = 10;
+    const pool = emails.concat(hardEmails);
+
+    function sampleArray(arr, n) {
+      const copy = arr.slice();
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy.slice(0, n);
+    }
+
+    // initial order is a random sample of TARGET emails from the larger pool
+    let order = sampleArray(pool, TARGET);
+
+    // bonusEmail remains defined later (no change)
+    const bonusEmail = {
+      id:999,
+      from:'support@micro-bank.com',
+      subject:'Account recovery',
+      snippet:'We noticed changes to your account. Recover immediately.',
+      body:`
+        <div class="email-html">
+          <div style="font-weight:700">Micro Bank — Support</div>
+          <div class="small">support@micro-bank.com</div>
+          <p>Dear Anthony,</p>
+          <p>We noticed changes to your account settings from an unrecognised device. To recover your account, reply with the last 4 digits of your card and your account username, or confirm your identity:</p>
+          <p><a href="#" class="btn-link btn-primary" data-link>Confirm identity</a></p>
+          <p class="small">Banks will <strong>never</strong> ask you to reply with full or partial card numbers via email.</p>
+        </div>
+      `,
+      isPhish:true,
+      indicators:["Asks for partial card digits","Reply-to option","Slightly altered domain"]
+    };
+
+    // state
+    let currentIndex = null;
+    let score = 0;
+    let answered = {};
+
+    function shuffle(a){for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+    order = shuffle(order);
+
+    const emailList = document.getElementById('emailList');
+    const readerEmpty = document.getElementById('reader-empty');
+    const readerContent = document.getElementById('reader-content');
+    const emailMeta = document.getElementById('email-meta');
+    const emailSubject = document.getElementById('email-subject');
+    const emailBody = document.getElementById('email-body');
+    const feedback = document.getElementById('feedback');
+    const scoreBox = document.getElementById('score');
+    const remaining = document.getElementById('remaining');
+
+    function renderList(){
+      emailList.innerHTML='';
+      order.forEach((e,idx)=>{
+        const div = document.createElement('div');
+        div.className='email-item';
+        div.dataset.id=e.id;
+        div.innerHTML = `<div class='email-subject'>${escapeHtml(e.subject)}</div><div class='email-sender'>${escapeHtml(e.from)}</div><div class='email-snippet'>${escapeHtml(e.snippet)}</div>`;
+        div.addEventListener('click',()=>openEmail(e.id));
+        emailList.appendChild(div);
+      });
+      remaining.textContent = `${order.length - Object.keys(answered).length} remaining`;
+      scoreBox.textContent = `${score}/${Math.max(10, order.length)}`;
+    }
+
+    function openEmail(id){
+      const e = order.find(x=>x.id==id);
+      if(!e) return;
+      currentIndex = order.indexOf(e);
+      readerEmpty.style.display='none';
+      readerContent.style.display='block';
+      emailMeta.innerHTML = `From: <strong>${escapeHtml(e.from)}</strong> &nbsp; <span class='small'>To: you@amp.com</span>`;
+      emailSubject.textContent = e.subject;
+      emailBody.innerHTML = e.body;
+      feedback.innerHTML = '';
+      attachLinkListeners();
+      highlightListItem(e.id);
+    }
+
+    function highlightListItem(id){
+      document.querySelectorAll('.email-item').forEach(el=>el.classList.remove('active'));
+      const el = emailList.querySelector(`[data-id="${id}"]`);
+      if(el) el.classList.add('active');
+    }
+
+    function attachLinkListeners(){
+      document.querySelectorAll('[data-link]').forEach(a=>{
+        a.addEventListener('click',async ev=>{
+          ev.preventDefault();
+          await showModal('Navigation blocked', '<p>This demo prevents navigation. In real emails, hover to inspect links and verify domains.</p>');
+        });
+        // a.addEventListener('mouseover',ev=>{
+        //   feedback.innerHTML = `<div class="small">Link preview: https://malicious.example/${Math.random().toString(36).slice(2,8)}</div>`;
+        // });
+        // a.addEventListener('mouseleave',()=>{if(!feedback.innerHTML.includes('Correct')) feedback.innerHTML='';});
+      });
+    }
+
+    async function answer(isPhish){
+      if(currentIndex === null) {
+        await showModal('Open an email', '<p>Open an email first.</p>');
+        return;
+      }
+      const e = order[currentIndex];
+      if(answered[e.id]){
+        await showModal('Already answered', '<p>You already answered this email.</p>');
+        return;
+      }
+      const correct = e.isPhish === isPhish;
+      answered[e.id] = {choice:isPhish,correct};
+      if(correct){
+        score++;
+        feedback.innerHTML = `<div class='result-box correct'>Correct — ${e.isPhish? 'This email is phishing.':'This email is legitimate.'}</div>`;
+      } else {
+        feedback.innerHTML = `<div class='result-box incorrect'>Incorrect — ${e.isPhish? 'This email was phishing.':'This email was legitimate.'}</div>`;
+      }
+      if(e.indicators){
+        feedback.innerHTML += `<div style="margin-top:8px;font-size:13px"><strong>Why:</strong><ul>${e.indicators.map(i=>`<li>${escapeHtml(i)}</li>`).join('')}</ul></div>`;
+      }
+      scoreBox.textContent = `${score}/${Math.max(10, order.length)}`;
+      remaining.textContent = `${order.length - Object.keys(answered).length} remaining`;
+
+      if(Object.keys(answered).length === order.length){
+        setTimeout(()=>finalResults(),300);
+      }
+    }
+
+    async function finalResults(){
+      // if user completed bonus as well (order length > 10) and perfect score, show confetti + congrats modal
+      const baseHtml = `<p>You scored <strong>${score}</strong> out of <strong>${order.length}</strong>.</p>`;
+      const perfectAll = (score === order.length);
+      const didIncludeBonus = order.length > 10;
+
+      if (perfectAll && didIncludeBonus) {
+        // 11/11 case -> confetti + congrats modal (do NOT show bonus modal)
+        await launchConfetti(3500, 220);
+        await showModal('Congratulations!', baseHtml + '<p class="small">Amazing — you achieved a perfect score including the bonus challenge.</p>', [
+          { text: 'Close', kind: 'primary', value: 'close' }
+        ]);
+        return;
+      }
+
+      if (score === order.length && !didIncludeBonus) {
+        // all training correct (10/10) — offer bonus
+        const choice = await showModal('Perfect! Training complete', baseHtml + '<p>All correct — you unlocked the bonus challenge.</p>', [
+          { text: 'Take Bonus', kind: 'primary', value: 'bonus' },
+          { text: 'Close', kind: 'ghost', value: 'close' }
+        ]);
+        if (choice === 'bonus') {
+          if (!order.find(e => e.id === bonusEmail.id)) {
+            order.push(bonusEmail);
+          }
+          renderList();
+          openEmail(bonusEmail.id);
+        }
+        return;
+      }
+
+      // not perfect
+      const restartChoice = await showModal('Results', baseHtml + '<p>Review the indicators and try again to unlock the bonus.</p>', [
+        { text: 'Restart', kind: 'primary', value: 'restart' },
+        { text: 'Close', kind: 'ghost', value: 'close' }
+      ]);
+      if (restartChoice === 'restart') {
+        // reset training (simple reset)
+        order = shuffle(emails.slice());
+        score = 0;
+        answered = {};
+        currentIndex = null;
+        renderList();
+        document.getElementById('reader-content').style.display = 'none';
+        document.getElementById('reader-empty').style.display = 'block';
+      }
+    }
+
+    document.getElementById('btnPhish').addEventListener('click',()=>answer(true));
+    document.getElementById('btnLegit').addEventListener('click',()=>answer(false));
+    document.getElementById('nextBtn').addEventListener('click',async ()=>{
+      const next = order.find(e=>!answered[e.id]);
+      if(next) openEmail(next.id);
+      else await showModal('Done', '<p>No more unread emails.</p>');
+    });
+
+    function escapeHtml(s){return String(s).replace(/[&<>\\"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]||ch));}
+
+    renderList();
+  </script>
+</body>
+</html>
